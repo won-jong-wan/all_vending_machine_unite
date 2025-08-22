@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>스마트 레스토랑 대시보드</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <!-- 왼쪽: 손님용 -->
+    <section class="left">
+      <!-- 테이블 선택 -->
+      <div class="topbar" id="table-picker">
+        <strong>테이블 선택:</strong>
+        <button class="pill" onclick="selectTable(1)">1</button>
+        <button class="pill" onclick="selectTable(2)">2</button>
+        <button class="pill" onclick="selectTable(3)">3</button>
+        <button class="pill" onclick="selectTable(4)">4</button>
+      </div>
+
+      <!-- 메뉴 카드 -->
+      <div class="menu" id="menu">
+        <article class="card" data-name="김치찌개" data-price="8000">
+          <div class="photo"><span>IMG</span></div>
+          <div class="meta"><div class="name">김치찌개</div><div class="price">₩8,000</div></div>
+          <button class="add" onclick="addToCart('김치찌개',8000)">＋</button>
+        </article>
+        <article class="card" data-name="불고기" data-price="10000">
+          <div class="photo"><span>IMG</span></div>
+          <div class="meta"><div class="name">불고기</div><div class="price">₩10,000</div></div>
+          <button class="add" onclick="addToCart('불고기',10000)">＋</button>
+        </article>
+        <article class="card" data-name="비빔밥" data-price="9000">
+          <div class="photo"><span>IMG</span></div>
+          <div class="meta"><div class="name">비빔밥</div><div class="price">₩9,000</div></div>
+          <button class="add" onclick="addToCart('비빔밥',9000)">＋</button>
+        </article>
+        <article class="card" data-name="라면" data-price="6000">
+          <div class="photo"><span>IMG</span></div>
+          <div class="meta"><div class="name">라면</div><div class="price">₩6,000</div></div>
+          <button class="add" onclick="addToCart('라면',6000)">＋</button>
+        </article>
+        <article class="card" data-name="만두" data-price="5000">
+          <div class="photo"><span>IMG</span></div>
+          <div class="meta"><div class="name">만두</div><div class="price">₩5,000</div></div>
+          <button class="add" onclick="addToCart('만두',5000)">＋</button>
+        </article>
+        <article class="card" data-name="콜라" data-price="2000">
+          <div class="photo"><span>IMG</span></div>
+          <div class="meta"><div class="name">콜라</div><div class="price">₩2,000</div></div>
+          <button class="add" onclick="addToCart('콜라',2000)">＋</button>
+        </article>
+      </div>
+
+      <!-- 장바구니 -->
+      <div class="cart">
+        <h3>장바구니</h3>
+        <ul id="cart"></ul>
+        <div class="total" id="total">합계: ₩0</div>
+        <div class="actions">
+          <button class="btn" onclick="clearCart()">비우기</button>
+          <button class="btn primary" onclick="submitOrder()">주문 전송</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 오른쪽: 직원용 -->
+    <section class="right">
+      <h2>테이블 주문 현황</h2>
+      <div class="tables">
+        <div class="table" id="table1"><h4>1번 테이블</h4><div class="summary"></div><div class="staff-list"></div><div class="staff-actions"><button class="btn" id="pay1" disabled onclick="payTable(1)">결제</button></div></div>
+        <div class="table" id="table2"><h4>2번 테이블</h4><div class="summary"></div><div class="staff-list"></div><div class="staff-actions"><button class="btn" id="pay2" disabled onclick="payTable(2)">결제</button></div></div>
+        <div class="table" id="table3"><h4>3번 테이블</h4><div class="summary"></div><div class="staff-list"></div><div class="staff-actions"><button class="btn" id="pay3" disabled onclick="payTable(3)">결제</button></div></div>
+        <div class="table" id="table4"><h4>4번 테이블</h4><div class="summary"></div><div class="staff-list"></div><div class="staff-actions"><button class="btn" id="pay4" disabled onclick="payTable(4)">결제</button></div></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    /* === 상태 === */
+    let selectedTable = null;    // 초기엔 미선택 → 메뉴 클릭 시 경고
+    const cart = [];
+
+    /* === 테이블 선택(손님) === */
+    function selectTable(n){
+      selectedTable = n;
+      document.querySelectorAll('#table-picker .pill').forEach(btn=>{
+        btn.classList.toggle('active', btn.textContent.trim()===String(n));
+      });
+    }
+
+    /* === 장바구니 === */
+    function addToCart(name, price){
+      if(selectedTable === null){
+        alert('테이블을 먼저 선택해 주세요.');
+        return;
+      }
+      const found = cart.find(v=>v.name===name);
+      if(found){ found.qty += 1; }
+      else{ cart.push({name, price, qty:1}); }
+      renderCart();
+    }
+    function clearCart(){ cart.length = 0; renderCart(); }
+    function renderCart(){
+      const ul = document.getElementById('cart');
+      ul.innerHTML = '';
+      let sum = 0;
+      cart.forEach(it=>{
+        sum += it.price * it.qty;
+        const li = document.createElement('li');
+        li.textContent = `${it.name} × ${it.qty} — ₩${(it.price*it.qty).toLocaleString()}`;
+        ul.appendChild(li);
+      });
+      document.getElementById('total').textContent = `합계: ₩${sum.toLocaleString()}`;
+    }
+
+    /* === 주문 전송 === */
+    async function submitOrder(){
+      if(selectedTable === null){ alert('테이블을 먼저 선택해 주세요.'); return; }
+      if(cart.length===0){ alert('장바구니가 비었습니다'); return; }
+      for(const it of cart){
+        for(let k=0;k<it.qty;k++){
+          const url = `/api/add?table=${encodeURIComponent(selectedTable)}&item=${encodeURIComponent(it.name)}`;
+          await fetch(url);
+        }
+      }
+      alert(`테이블 ${selectedTable}번으로 주문 전송 완료`);
+      clearCart();
+      await refreshStaffView();
+    }
+
+    /* === 직원 화면 렌더링 === */
+    function renderStaffTable(tableNo, data){
+      const root = document.getElementById('table'+tableNo);
+      const summaryEl = root.querySelector('.summary');
+      const listEl = root.querySelector('.staff-list');
+      const payBtn = document.getElementById('pay'+tableNo);
+
+      summaryEl.textContent = data?.summary || '';
+
+      listEl.innerHTML = '';
+      let allPrepared = true;
+      (data?.items || []).forEach(it=>{
+        const row = document.createElement('div');
+        row.style.margin = '6px 0';
+
+        // 체크박스들을 수량만큼 만든다
+        const checkWrap = document.createElement('span');
+        for(let i=1;i<=it.qty;i++){
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.style.marginRight = '6px';
+          cb.checked = (i <= it.prepared);
+          cb.addEventListener('change', async ()=>{
+            // 체크된 개수 count 해서 서버에 반영
+            const nowChecked = [...checkWrap.querySelectorAll('input[type="checkbox"]')].filter(x=>x.checked).length;
+            await fetch(`/api/set_prepared?table=${encodeURIComponent(tableNo)}&item=${encodeURIComponent(it.name)}&count=${encodeURIComponent(nowChecked)}`);
+            await refreshStaffView();
+          });
+          checkWrap.appendChild(cb);
+        }
+
+        // 라벨
+        const label = document.createElement('span');
+        label.textContent = ` ${it.name} (×${it.qty})`;
+
+        row.appendChild(checkWrap);
+        row.appendChild(label);
+        listEl.appendChild(row);
+
+        if(!(it.prepared >= it.qty)) allPrepared = false;
+      });
+
+      // 결제 버튼 활성/비활성
+      const hasItems = (data && data.items && data.items.length>0);
+      payBtn.disabled = !(hasItems && allPrepared);
+    }
+
+    async function payTable(tableNo){
+      const ok = confirm(`${tableNo}번 테이블 결제 처리할까요? (처리 후 주문이 초기화됩니다)`);
+      if(!ok) return;
+      await fetch(`/api/clear?table=${encodeURIComponent(tableNo)}`);
+      await refreshStaffView();
+    }
+
+    function applySnapshot(orders){
+      // 테이블 1~4 렌더
+      for(let t=1;t<=4;t++){
+        const data = (orders||[]).find(o=>o.table===t);
+        renderStaffTable(t, data);
+      }
+    }
+
+    async function refreshStaffView(){
+      const s = await fetch('/api/snapshot').then(r=>r.json()).catch(()=>({orders:[]}));
+      applySnapshot(s.orders);
+    }
+
+    // 초기 1회 로딩
+    refreshStaffView();
+  </script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+:root{
+  --brand:#FFC400;      /* kiosk yellow */
+  --accent:#FFCC33;     /* orange */
+  --line:#e9e9e9;
+  --card:#fff;
+  --text:#111;
+  --muted:#666;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:#fafafa;font-family:system-ui,Segoe UI,Roboto,Apple SD Gothic Neo,나눔고딕,sans-serif;color:var(--text)}
+.wrap{display:grid;grid-template-columns:1fr;gap:18px;min-height:100vh;padding:18px}
+h1,h2,h3{margin:0 0 12px}
+
+/* card */
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+
+/* Kiosk (smaller, 4 columns) */
+.k-grid{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(140px,1fr)); /* 한 줄 4개 */
+  gap:10px;
+
+  /* ▼ 스크롤 추가: 카드 안에서만 스크롤되게 */
+  max-height: calc(100vh - 220px);  /* 필요하면 숫자만 조정 */
+  overflow-y:auto;
+  padding-right:6px;                 /* 스크롤 공간 */
+}
+/* 간단 스크롤바 스타일 */
+.k-grid::-webkit-scrollbar{width:12px}
+.k-grid::-webkit-scrollbar-track{background:rgba(0,0,0,.06);border-radius:9999px}
+.k-grid::-webkit-scrollbar-thumb{background:#9ca3af;border-radius:9999px}
+.k-grid{scrollbar-width:thin;scrollbar-color:#9ca3af transparent}
+
+.k-item{
+  position:relative;
+  border:1px solid var(--line);
+  border-radius:12px;
+  overflow:hidden;
+  background:#fff;
+  font-size:14px;              /* 전체 글자 크기 축소 */
+}
+
+/* ▼ 노란 영역: 정사각형(큰 높이) → 이미지 크기만큼 보이도록 변경 */
+.k-photo{
+  /* 기존: aspect-ratio:1/1;  → 제거/무력화 */
+  aspect-ratio:auto !important;     /* 높이 고정 해제 */
+  background:linear-gradient(135deg,#ffe082,#ffd54f);
+  padding:16px;                     /* 이미지 주변 여백 */
+  display:flex; align-items:center; justify-content:center;
+  color:#0008; font-weight:700;
+}
+
+/* 이미지 크기 제한(원하는 값으로 조절 가능) */
+.k-photo img{
+  display:block;
+  max-width:170px;
+  max-height:170px;
+  width:auto; height:auto;
+  object-fit:contain;
+  border-radius:12px;
+}
+
+.k-meta{ padding:8px; }        /* 여백 축소 */
+.k-name{ font-weight:700; font-size:14px; }
+.k-price{ color:var(--muted); margin-top:3px; font-size:12px; }
+
+.k-add{
+  position:absolute; right:8px; bottom:8px;
+  width:36px; height:36px;     /* 버튼 더 작게 */
+  border-radius:50%;
+  background:var(--brand);
+  display:flex; align-items:center; justify-content:center;
+  border:none; cursor:pointer; font-size:18px;
+  box-shadow:0 3px 8px rgba(0,0,0,.12);
+}
+.k-add:active{ transform:scale(.96); }
+
+.k-cart{
+  position:sticky; bottom:0; left:0; right:0;
+  margin-top:14px; border:2px solid var(--accent);
+  border-radius:12px; padding:10px; background:#fff;
+}
+.k-cart ul{ margin:0; padding-left:16px; max-height:140px; overflow:auto; }
+.k-actions{ display:flex; gap:8px; margin-top:8px; }
+.btn{ padding:8px 12px; border-radius:10px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+
+/* Staff */
+.s-grid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:14px}
+.s-empty{color:var(--muted)}
+.s-order{border:2px solid #f7c6e6;border-radius:14px;padding:12px;background:#fff}
+.s-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.s-code{font-weight:800}
+.s-items{margin-top:6px}
+.s-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.s-name{flex:1}
+.s-qty{color:var(--muted)}
+.s-pay{margin-top:10px}
+.s-pay .btn{width:100%}
+.s-pay .btn:disabled{opacity:.5;cursor:not-allowed}
+
+.s-order {
+  border: 2px solid #FFCC33;
+  border-radius: 10px;
+  padding: 8px;         /* 내부 여백 최소화 */
+  background: #fff;
+  font-size: 14px;
+  display: inline-block; /* 내용 크기만큼만 높이 차지 */
+}
+
+.s-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;            /* 위쪽 여백 제거 */
+  padding: 0;
+}
+
+.s-items {
+  margin: 0;            /* ul 같은 경우 여백 제거 */
+  padding: 0;
+  list-style: none;
+}
+
+.s-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;        /* 줄 간격 최소화 */
+}
+
+.s-pay {
+  margin: 4px 0 0 0;    /* 버튼 위쪽만 아주 조금 간격 */
+  padding: 0;
+}
+
+.s-pay .btn {
+  width: 100%;
+  font-size: 13px;
+  padding: 4px;
+}
+
+/* Responsive */
+@media (max-width:1100px){
+  .k-grid{grid-template-columns:repeat(2,minmax(140px,1fr))}
+  .s-grid{grid-template-columns:repeat(2,minmax(220px,1fr))}
+}
+@media (max-width:720px){
+  .k-grid{grid-template-columns:1fr}
+  .s-grid{grid-template-columns:1fr}
+}
+

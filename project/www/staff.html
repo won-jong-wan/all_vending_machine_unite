@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Staff</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <h1>👩‍🍳 Staff </h1>
+
+    <div id="empty" class="card s-empty" style="display:none;">No orders yet.</div>
+    <div class="s-grid" id="orders"></div>
+  </div>
+
+  <script>
+    async function fetchOrders(){
+      const data = await fetch('/api/orders')
+        .then(r=>r.json())
+        .catch(()=>({orders:[]}));
+      renderOrders(data.orders||[]);
+    }
+
+    function renderOrders(orders){
+      const grid = document.getElementById('orders');
+      const empty = document.getElementById('empty');
+      grid.innerHTML = '';
+      if(orders.length===0){ 
+        empty.style.display='block'; 
+        return; 
+      } else { 
+        empty.style.display='none'; 
+      }
+
+      orders.forEach(o=>{
+        const card = document.createElement('div'); 
+        card.className='s-order';
+
+        const head = document.createElement('div'); 
+        head.className='s-head';
+
+        const code = document.createElement('div'); 
+        code.className='s-code'; 
+        code.textContent = `#${o.code}`;
+
+        head.appendChild(code); 
+        card.appendChild(head);
+
+        const itemsWrap = document.createElement('div'); 
+        itemsWrap.className='s-items';
+        let allDone = true;
+
+        (o.items||[]).forEach(it=>{
+          const row = document.createElement('div'); 
+          row.className='s-row';
+
+          const cb = document.createElement('input'); 
+          cb.type='checkbox'; 
+          cb.checked=!!it.done;
+
+          cb.addEventListener('change', async ()=>{
+            await fetch(`/api/set_done?order=${encodeURIComponent(o.id)}&item=${encodeURIComponent(it.name)}&done=${cb.checked?1:0}`);
+            await fetchOrders();
+          });
+
+          const name = document.createElement('div'); 
+          name.className='s-name'; 
+          name.textContent = it.name;
+
+          const qty  = document.createElement('div'); 
+          qty.className='s-qty';  
+          qty.textContent = `* ${it.qty}`;
+
+          row.appendChild(cb); 
+          row.appendChild(name); 
+          row.appendChild(qty);
+          itemsWrap.appendChild(row);
+
+          if(!cb.checked) allDone = false;
+        });
+
+        card.appendChild(itemsWrap);
+
+        const pay = document.createElement('div'); 
+        pay.className='s-pay';
+
+        const btn = document.createElement('button'); 
+        btn.className='btn'; 
+        btn.textContent='Clear';
+
+        btn.disabled = !allDone || (o.items||[]).length===0;
+
+        btn.addEventListener('click', async ()=>{
+          if(!confirm(`#${o.code} will be cleared. Proceed?`)) return;
+          await fetch(`/api/pay?order=${encodeURIComponent(o.id)}`);
+          await fetchOrders();
+        });
+
+        pay.appendChild(btn); 
+        card.appendChild(pay);
+
+        grid.appendChild(card);
+      });
+    }
+
+    // 최초 실행 + 주기적 새로고침
+    fetchOrders();
+    setInterval(fetchOrders, 2500); // 2.5초마다 갱신
+  </script>
+</body>
+</html>
+
