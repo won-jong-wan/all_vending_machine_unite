@@ -1,0 +1,6 @@
+../Core/Src/paser.c:10:5:parse_order_string	9
+../Core/Src/paser.c:73:5:get_menu_quantity	3
+../Core/Src/paser.c:83:5:get_total_amount	1
+../Core/Src/paser.c:88:5:get_item_count	1
+../Core/Src/paser.c:93:6:reset_order_data	1
+../Core/Src/paser.c:100:5:get_total_quantity	2

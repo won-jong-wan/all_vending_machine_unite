@@ -21,8 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define MAX_CMD_LEN 10
-#define BUFFER_LEN 50
+#include <string.h>
+#include "paser.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,7 +32,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define MAX_CMD_LEN 10
+#define BUFFER_LEN 200
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart6;
@@ -59,34 +61,66 @@ static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART6_UART_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/**************************/
+//bluetooth
 uint8_t tx_flag = 0;
 uint8_t rx_flag = 0;
 
 char rx_l_buf = 0;
-uint8_t rx_header = 0;
+uint32_t rx_header = 0;
+uint32_t rx_length = 0;
 
 char blue_tx_buf[BUFFER_LEN];
 char blue_rx_buf[BUFFER_LEN];
 
+uint8_t all_count = 0;
+
 char* cmd[MAX_CMD_LEN];
 
 /**************************/
+//distance sensor
 uint32_t trg_clk = 5;
 uint32_t echo_clk = 0;
 uint32_t d_clk = 0;
 
+uint32_t sonic_start_tick = 0;
+const uint32_t sonic_d_tick = 2000;
+
+uint32_t sonic_past = 0;
+const uint32_t dd_clk = 120;
+
+uint8_t fall_detected = 0;
+
+uint32_t debug_past_clk = 0;
+uint32_t debug_now_clk = 0;
+
+/**************************/
+//motor
+const uint32_t motor_d_tick = 2000;
+const uint32_t motor_duty =1000;
+const uint32_t motor_duty_s = 50;
+
+uint32_t motor_start_tick = 0;
+uint8_t motor_flag = 0;
+
+uint32_t debug_tick = 0;
+
+/**************************/
+//callback
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	if(rx_header >= MAX_CMD_LEN){\
+	if(rx_header >= BUFFER_LEN){
 		rx_header = 0;
 	}
 	if(rx_l_buf == '\r' || rx_l_buf == '\n'){
 		rx_flag = 1;
+		rx_length = rx_header;
 		rx_header = 0;
 	}else{
 		blue_rx_buf[rx_header] = rx_l_buf;
@@ -99,7 +133,34 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if(GPIO_Pin == ECHO_Pin){
 		echo_clk = htim1.Instance->CNT;
+		if(echo_clk > 300) echo_clk = 300+trg_clk;
 	}
+}
+
+void read_rx_buf(){
+	if(rx_flag == 1){
+		parse_order_string(blue_rx_buf);
+		memset(blue_rx_buf, 0, rx_length);
+		all_count = get_total_quantity();
+		rx_flag = 0;
+	}
+}
+
+void measure_distance(){
+	  //flag
+	if(echo_clk > trg_clk){
+		d_clk = echo_clk - trg_clk;
+	}
+}
+
+void detect_falling(){
+	if(abs((d_clk - sonic_past)>dd_clk && sonic_past != 0) && (sonic_past > d_clk)){
+		debug_past_clk = sonic_past;
+		debug_now_clk = d_clk;
+		fall_detected = 1;
+		sonic_start_tick = HAL_GetTick();
+	}
+	sonic_past = d_clk;
 }
 
 /* USER CODE END 0 */
@@ -137,30 +198,50 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART6_UART_Init();
   MX_TIM1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_UART_Receive_DMA(&huart6, (uint8_t*)&rx_l_buf, 1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 
+  htim2.Instance->CCR1 = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(rx_flag == 1){
-		  tx_flag = 1;
-		  strcpy(blue_tx_buf, blue_rx_buf);
-		  blue_tx_buf[strlen(blue_tx_buf)] = '\n';
-		  //memset(blue_rx_buf, 0x0, strlen(blue_rx_buf));
-		  rx_flag = 0;
+	  read_rx_buf();
+	  measure_distance();
+	  //sampling
+	  if((HAL_GetTick() - sonic_start_tick) > sonic_d_tick){
+		  detect_falling();
 	  }
-	  if(tx_flag == 1){
-		  HAL_UART_Transmit_DMA(&huart6, (uint8_t*)blue_tx_buf, strlen(blue_tx_buf));
-		  //memset(blue_tx_buf, 0x0, strlen(blue_tx_buf));
-		  tx_flag = 0;
+
+	  if((all_count > 0) && (motor_flag != 1)){
+		  motor_flag = 1;
+		  motor_start_tick = HAL_GetTick();
+		  fall_detected = 0;
 	  }
-	  if(echo_clk > trg_clk){
-		  d_clk = echo_clk - trg_clk;
+
+	  debug_tick = HAL_GetTick();
+
+	  //active
+	  if(motor_flag == 1){
+		  if((HAL_GetTick() - motor_start_tick) > motor_d_tick){
+			  htim2.Instance->CCR1 = 0;
+		  }
+		  else if(motor_start_tick > HAL_GetTick()){
+			  motor_start_tick = HAL_GetTick();
+		  }else{
+			  htim2.Instance->CCR1 = motor_duty;
+		  }
+		  if(fall_detected == 1){
+			  htim2.Instance->CCR1 = 0;
+			  motor_flag = 0;
+			  all_count--;
+		  }
+
 	  }
     /* USER CODE END WHILE */
 
@@ -238,7 +319,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 1000;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 10000;
+  htim1.Init.Period = 5000;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -262,7 +343,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 100;
+  sConfigOC.Pulse = 5;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -287,6 +368,65 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1000;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 
 }
 
